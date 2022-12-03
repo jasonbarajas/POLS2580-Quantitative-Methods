@@ -1,0 +1,358 @@
+---
+title: 'Lab 02 - Visualizing data on COVID-19 in the U.S.'
+author: "Jason Barajas"
+date: "Last Updated `r format(Sys.Date())`"
+output:
+  html_document:
+    theme: journal
+    toc: TRUE
+    toc_float: TRUE
+    toc_depth: 2
+    number_sections: TRUE
+---
+
+```{r setup, include = FALSE, cache = FALSE}
+knitr::opts_chunk$set(error = TRUE, 
+                      comment = NA, 
+                      warnings = FALSE, 
+                      errors = FALSE, 
+                      messages = FALSE, 
+                      cache = F,
+                      tidy = FALSE)
+```
+
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+
+
+
+# Overview {-}
+
+
+We have two goals for today.
+
+The first is to replicate and extend this figure:
+
+```{r goal, echo=F}
+knitr::include_graphics("https://pols1600.paultesta.org/labs/images/02_fig.png")
+```
+
+
+I don't expect anyone to be able to recite from memory the exact code, functions, and syntax to accomplish this task. 
+
+That said, you've already seen the code you need. 
+
+It's available to you in multiple places like the slides (week 2 [here](https://pols2580paultesta.org/slides/02-slides.html#1), week 2 [here](https://pols2580.paultesta.org/slides/03-slides.html)) and last week's [labs](https://pols2580.paultesta.org/labs/01-lab-comments.html) 
+
+Once you've successfully reproduced this figure, please change at least one aspect of the chart to make it more legible and/or informative. You might:
+
+- Add more informative labels to the axes
+
+- Try mapping other features of the data to additional aesthetics (e.g. `size`, `alpha`)
+
+- Try faceting the plot by other features of the data 
+
+My is that this lab will help you do the following:
+
+- **Chunk big tasks into smaller concrete steps**
+  - Learn how to take a complex problem ("How do I produce a figure that shows the average rate of new cases per month for states with a particular type of face mask policy") which you may think you have no idea how to do and break this challenge down into concrete tasks which you do know how do ("Well first, I'll need to load some packages to work with and visualize data. Then, I'll need to get the data. And then...")
+- **Think and write programmatically**
+  - In this .Rmd file, I'll first ask you to outline, conceptually, all the steps you'll need to do to produce this figure. 
+  - Don't worry if you can't think of all the necessary steps or aren't sure of the order. We'll produce a collective outline of what we need to do before getting to the actual coding
+  - When we do code, I'll ask you to organize your code as outlined below:
+    - Separate your steps into sections using the `#` headers in Markdown
+    - Write a brief overview in words that a normal human can understand, what the code in that section is doing
+    - Paste the code for that section into a code chunk
+    - Add brief comments to this code to help your reader understand what's happening
+    - Knit your document after completing each section.
+- **Mapping concepts to code**
+  - Again you shouldn't have to write much code. Just copy and paste from the labs and slides.
+  - Your goal for today is to interpret that code and develop a mental map that allows you to say when I want to do this type of task (say "recode data"), I need to use some combination of these functions (`%>%`, `mutate()`, maybe `group_by()` or `case_when()`)
+  - But shouldn't we be writing our own code?! Yes. That's where your second task comes in.
+  
+After you've successfully replicated and extended the figure above, I'd like you to 
+
+- explore the data some more
+- formulate a possible question you might ask of the data
+- attempt to produce a figure that provides some insight into that question
+ 
+More on this below. 
+  
+
+
+
+
+# Please knit this .Rmd file {-}
+
+For every lab:
+
+- Download the file
+- Save it in your course folder
+- Knit the document
+- Open the html file in your browser (Easier to read)
+- Knit the document again after completing a section or chunk (Error checking)
+- Upload the final lab to [Canvas](https://canvas.brown.edu/courses/1087979/assignments/7870521?module_item_id=10762395){target="_blank"}.
+
+# Replicating the example figure
+
+## Outline tasks {-}
+
+Before we begin to code, let's take a moment to organize our thoughts. 
+
+Using the list bellow, write out as many things that your code needs to do to accomplish the task.
+
+- Create the figure
+- Modify the figure
+- Set up workspace
+- Load Libraries
+- Load data using covid19 function
+- Recode data
+- Create data variable
+- Use data variable to create data month 
+- Create measure of new cases vs old cases 
+- Stuff that needs to happen for us to do other stuff
+- ...
+
+If something seems to broad, like 
+
+- Recode data
+
+Try adding some sub-bullets
+
+- Recode data:
+  - Create date-month variable
+  - Create face_mask variable
+
+
+## Organize tasks {-}
+
+Now take that list and organize it into a set of sequential steps. What needs to happen first? Once that happens what will you do next. Again, 
+
+To begin let's outline the tasks we well need to complete this process:
+
+1. Set up workspace
+  a. If necessary, install any new packages
+  b. Load libraries
+2. Load data
+3. Load data using covid19 function
+4. Recode data
+5. Create data variable
+6. Use data variable to create data month 
+7. Create measure of new cases vs old cases 
+8. Group by states 
+
+
+Now start to translate your tasks into code, using section headers and code chunks to organize your workflow
+
+# Step 1 {-} Load libraries
+
+Describe in words what your code below is doing
+
+```{r, Loading Packages}
+#Loading the packages that will be necessary in our analysis
+the_packages <- c(
+  ## R Markdown
+  "tinytex", "kableExtra", "xaringan", "xaringanExtra",
+  ## Tidyverse
+  "tidyverse","lubridate", "forcats", "haven","labelled",
+  ## Extensions for ggplot
+  "ggmap","ggrepel", "ggridges", "ggthemes","ggpubr",
+  "GGally",
+  # Data 
+  "COVID19","maps","mapdata","DT","zoo"
+)
+the_packages
+
+# Below I am assigning the name ipak to the installed packages 
+ipak <- function(pkg){
+    new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+    if (length(new.pkg)) 
+        install.packages(new.pkg, dependencies = TRUE)
+    sapply(pkg, require, character.only = TRUE)
+}
+
+ipak(the_packages)
+```
+
+```{r, Loading Data}
+#Below I am loading the dataset required for our analysis 
+covid <- COVID19::covid19(
+  country = "US",
+  level = 2,
+  verbose = T
+)
+```
+
+
+```{r, Creating Territories Object}
+# Write the code for Step 1 here
+# ---- 1. Create territories object
+territories <- c(
+  "American Samoa",
+  "Guam",
+  "Northern Mariana Islands",
+  "Puerto Rico",
+  "Virgin Islands"
+  )
+```
+
+```{r, Creating Dataframe}
+#Below I am creating a new data frame that only includes the 50 US states and Washington D.C., which I am naming "covid_us".
+covid_us <- covid %>%
+  filter(!administrative_area_level_2 %in% territories)
+# covid_us should have fewer rows than covid
+dim(covid_us)
+```
+
+
+```{r, Creating New Variables}
+#Below I am creating four new variables: state, new cases per 100000 people, new cases on a seven day basis, and a face mask variable that assigns a number dependent on the degree of restriction the mask policy imposes. 
+covid_us %>%
+  mutate(
+    state = administrative_area_level_2,
+  ) %>%
+  dplyr::group_by(state) %>%
+  mutate(
+    new_cases = confirmed - lag(confirmed),
+    new_cases_pc = new_cases / population * 100000,
+    new_cases_7d = zoo::rollmean(new_cases, k = 7, fill = NA, align = "right"),
+    new_cases_pc_7d = zoo::rollmean(new_cases_pc, k = 7, fill = NA, align = "right")
+    ) %>%
+  mutate(
+    face_masks = case_when(
+      facial_coverings == 0 ~ "No policy",
+      abs(facial_coverings) == 1 ~ "Recommended",
+      abs(facial_coverings) == 2 ~ "Some requirements",
+      abs(facial_coverings) == 3 ~ "Required shared places",
+      abs(facial_coverings) == 4 ~ "Required all times",
+    ) %>% factor(., levels = c("No policy","Recommended", "Some requirements", "Required shared places", "Required all times")
+    ) 
+    ) %>%
+  mutate(
+    year = year(date),
+    month = month(date),
+    year_month = paste(year, str_pad(month, width = 2, pad = 0), sep = "-"),
+    percent_vaccinated = people_fully_vaccinated / population*100  
+    ) -> covid_us
+```
+
+```{r, New Data Frame}
+#Below I am creating a new data frame that groups by the month of the year and face masks, and rounds the new cases of covid-19.
+covid_us %>%
+  group_by(year_month, face_masks) %>%
+  summarise(
+    n = length(unique(state)),
+    new_cases_pc = round(mean(new_cases_pc, na.rm = T))) -> covid4graph
+```
+
+
+```{r, Remaking the Plot}
+#Below I am replicating the example figure that plots new cases over the month of the year, which is then color coded by the face mask policy.
+
+covid4graph %>%
+  filter(!is.na(face_masks)) %>%
+  filter(year_month >= "2020-01" & year_month<"2022-03") %>%
+  ggplot( aes(x = new_cases_pc, 
+              y = year_month, 
+              col = face_masks),
+          title(main = "New Covid Cases Between Janaury 2020 and February 2022 Based on Face Mask Policies")
+          ) + 
+  geom_point()
+```
+
+
+# Step 2 {-}
+
+Perhaps Step 2 has multiple parts and code chunks
+
+Use sub headers to break down step 2 into its constituent parts
+
+## Step 2.1 {-}
+
+Describe briefly (in a sentence or two or a couple of bullet points) what this section does
+
+```{r}
+# Write the code for Step 2.1 here
+```
+
+## Step 2.2 {-}
+
+Describe briefly (in a sentence or two or a couple of bullet points) what this section does
+
+```{r}
+# Write the code for Step 2.2 here
+```
+
+
+
+# Asking your own questions of the COVID-19 Data
+
+Your second task for this lab is to get some practice exploring data, formulating questions, and visualizing data to provide insights into that question.
+
+## Explore the data
+
+In this section, please write some code that explores what else is in your dataset:
+
+- What other outcomes of interest might we study (e.g. deaths, vaccinations, tests, mobility)
+- What other predictors or policies might explain variation in these outcomes
+
+In exploring these variables look at their distributions. Get a sense of any potential recoding, cleaning, transformations you might wish to accomplish. 
+
+```{r hlo, results="hide"}
+
+```
+
+
+You'll find the codebook for the COVID-19 data [here](https://COVID19datahub.io/articles/docs.html#policy-measures)
+
+Also, note in the code chunk header that I've included the argument `results="hide"`. This will also you 
+
+## Formulate a new question you might ask of the data
+
+Based on your exploration of the available data, what's one question you might ask of these data? 
+
+Here are some examples:
+
+- What effect, if any, did stay at home orders have on new cases/Covid-19 related deaths?
+- What states took the most stringent response to Covid-19 in the early months of the pandemic?
+- Did states that took more stringent responses to Covid-19 tend to have better health outcomes?
+
+#My question: did mask policies have an effect on hospitalizations? 
+
+## Produce a figure that provides insight into your question
+
+
+Finally think about the kind of figure that might give you insight into these questions. Maybe it's a barchart, or a series of trend lines before and after some policy change. Ask yourself if 
+
+- Do you need to recode existing variables?
+- Do you need to create new variables?
+- If you're feeling adventurous, do you need to [load and merge in new data](https://r4ds.had.co.nz/relational-data.html)
+
+
+```{r additional recoding}
+# Do any recoding you need to do here
+covid_us %>%
+  group_by(year_month, face_masks) %>%
+  summarise(
+    n = length(unique(state)),
+    hosp = round(mean(hosp, na.rm = T))) -> covidgraph2
+```
+
+
+Don't feel like you have to produce a publication worthy figure. Really, any figure will do. Even if it's just a start towards addressing the kind of question you'd want to explore.
+
+```{r new figure}
+# Create a new figure here
+
+covidgraph2 %>%
+  filter(!is.na(face_masks)) %>%
+  filter(year_month >= "2020-01" & year_month<"2022-03") %>%
+  ggplot( aes(x = hosp, 
+              y = year_month, 
+              col = face_masks),
+          title(main = "Hospitalizations Between Janaury 2020 and February 2022 Based on Face Mask Policies")
+          ) + 
+  geom_point()
+```
+
